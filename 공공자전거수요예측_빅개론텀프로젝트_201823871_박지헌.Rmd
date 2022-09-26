@@ -1,0 +1,111 @@
+---
+title: "공공자전거수요예측_빅개론텀프로젝트_201823871_박지헌"
+author: "ParkJiHeon"
+date: '2022 5 30 '
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# 공공자전거수요예측_빅개론텀프로젝
+### 빅데이터개론 및 분석 프로젝트
+### e비즈니스학과 201823871 박지헌
+```{r}
+getwd()
+setwd('C:/Users/82104/my-workspace/R-workspace/')
+rm(list = ls())
+library(psych)
+library(caret)
+library(doBy)
+library(randomForest)
+library(e1071)
+library(rpart)
+df = read.csv('2020.AI.bike-train.csv')
+str(df)
+```
+
+```{r}
+#table(is.na(df))
+#plot(df)
+df = df[-1:-2];head(df)
+df = df[-2];head(df)
+pairs.panels(df)
+
+scale_model <- caret::preProcess(df[,-8], method = 'range')
+df_scaled <- predict(scale_model, df)
+head(df_scaled)
+
+set.seed(123)
+idx_train = sample(1:nrow(df_scaled), size = 800)
+df_train = df_scaled[idx_train, ]
+df_test = df_scaled[-idx_train, ]
+
+
+#https://bioinformaticsandme.tistory.com/290
+# 다중회귀분석
+m1 = lm(count~., data = df_train)
+summary(m1)
+p1 = predict(m1, df_test);cor(df_test$count, p1)
+
+m1 = update(m1, .~.-hour_bef_visibility-hour_bef_pm2.5)
+summary(m1)
+p1 = predict(m1, df_test);cor(df_test$count, p1)
+
+
+# 의사결정나무
+m2 = rpart(count~., data = df_train)
+summary(m2)
+p2 = predict(m2, df_test);cor(df_test$count, p2)
+plot(m2)
+text(m2, use.n = TRUE)
+
+# 랜덤 포레스트트
+for(nt in c(20,50,100,200,300,400,500)) {
+        m = randomForest(count~., data = df_train, ntree = nt)
+        summary(m)
+        p = predict(m, df_train)
+        cat("ntree =",nt,"acc =",cor(df_train$count, p),"\n")
+}
+
+for(nd in 1:30) {
+        m = randomForest(count~., data = df_train, maxnodes=nd)
+        summary(m)
+        p = predict(m, df_train)
+        cat("node =", nd, "acc =",cor(df_train$count, p),"\n")
+}
+
+OPT_NT = 50 
+OPT_ND = 29      
+
+m3 = randomForest(count~., data = df_train, ntree = OPT_NT, maxnodes=OPT_ND)
+summary(m3)
+p3 = predict(m3, df_test);cor(df_test$count, p3)
+
+varUsed(m3)
+varImpPlot(m3)
+
+# SVM
+m4 = svm(count~., data = df_train)
+summary(m4)
+p4 = predict(m4, df_test);cor(df_test$count, p4)
+
+
+#cv
+control = trainControl(method = 'cv', number=10)
+formular = count~.
+
+s = train(formular, data=df_train, method='svmLinear', metric='RMSE',trControl=control)
+sp = train(formular, data=df_train, method='svmPoly', metric='RMSE',trControl=control)
+sr = train(formular, data=df_train, method='svmRadial', metric='RMSE',trControl=control)
+rf = train(formular, data=df_train, method='rf', metric='RMSE',trControl=control)
+r = train(formular, data=df_train, method='rpart', metric='RMSE',trControl=control)
+lm = train(formular, data=df_train, method='lm', metric='RMSE',trControl=control)
+k = train(formular, data=df_train, method='knn', metric='RMSE',trControl=control)
+
+resamp = resamples(list(svm=s, svmPoly=sp, svmRadial=sr, RF=rf, decisionTree=r, regression=lm,kNN=k))
+summary(resamp)
+sort(resamp,decreasing = TRUE)
+dotplot(resamp)
+
+```

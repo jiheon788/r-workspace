@@ -1,0 +1,17 @@
+---
+title: "Untitled"
+author: "ParkJiHeon"
+date: '2022 5 31 '
+output: word_document
+---
+
+
+
+```{r}
+
+# EDA
+df = read.csv('2020.AI.bike-train.csv')
+str(df)
+table(is.na(df))
+summary(df)
+```
