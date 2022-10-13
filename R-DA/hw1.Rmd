@@ -1,0 +1,58 @@
+---
+title: "hw1"
+author: "ParkJiHeon"
+date: '2021 3 22 '
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+library(tidyverse)
+library(VIM)
+library(cowplot)
+library(ggcorrplot)
+library(GGally)
+library(ggthemes)
+library(MASS)
+library(car)
+library(caret)
+library(ROCR)
+library(e1071)
+library(gmodels)
+library(splitstackshape)
+load("telData20210317.Rda")
+#summary(finalData)
+data <- read.csv("ChurnData.csv",stringsAsFactors = T)
+data <- data[1:1000,]
+summary(data)
+pSeed<-12345
+set.seed(pSeed)
+training800 <-stratified(finalData,"이탈여부",0.8)
+testing200 <-finalData[!finalData$고객ID%in%training800$고객ID,]
+str(finalData)
+table(training800$이탈여부)
+table(testing200$이탈여부)
+training800<-training800[,-1]
+model1_1 <- glm(이탈여부~.,data = training800,family = binomial(link = "logit"))
+summary(model1_1)
+
+model1_2 <- stepAIC(model1_1,direction = "both")
+summary(model1_2)
+formula(model1_2)
+(vif_vars <- as.data.frame(vif(model1_2)))
+
+model1_3 <- glm(이탈여부~성별+d.dummy.고+d.dummy.중저+연령+서비스기간+단선횟수+주간통화횟수+주간통화시간_분+야간통화횟수+주말통화횟수+주말통화시간_분+국내통화시간_분,data = training800,family = binomial)
+summary(model1_3)
+
+
+pred <- predict(model1_2,newdata = testing200[,which(colnames(testing200)!= "이탈여부")],type = "response")
+pred
+summary(pred)
+# check model test
+pred_churn <- factor(ifelse(pred >= 0.50, "Yes", "No"))
+actual_churn <- factor(ifelse(testing200$이탈여부==1,"Yes","No"))
+table(actual_churn,pred_churn)
+
+caret::confusionMatrix(pred_churn,actual_churn,positive = "Yes")
+###로지스틱회귀분석 적중률 72
+```
